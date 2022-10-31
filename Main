@@ -1,0 +1,90 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <wiringPi.h>
+#include <wiringPiI2C.h>
+#include <pcf8574.h>
+#include <lcd.h>
+#include <time.h>
+
+#define BuzzerGreenLedPin 1 // Buzzer signal pin + green led signal pin connected together to BCM#18
+#define PIRPin 0 // PIR sensor BCM#17
+#define RedLedPin 27 // Red led pin BCM#16
+
+// Output pins of PCF8574 is connected to LCD1602 pins 
+#define RS BASE+0
+#define RW BASE+1
+#define EN BASE+2
+#define LED BASE+3
+#define D4 BASE+4
+#define D5 BASE+5
+#define D6 BASE+6
+#define D7 BASE+7
+
+#define BASE 64 // Base number
+
+int pcf8574_address = 0x27; // Default address of IC chip PCF8574T
+int lcdhd; // Handle LCD
+
+int main(void)
+{
+	// If initialization of wiringPi fails, print error message
+    if(wiringPiSetup() == -1){
+		printf("wiringPi setup failed") ;
+        exit(1);
+}
+
+//Set the pin mode
+pinMode(BuzzerGreenLedPin, OUTPUT); // Buzzer and green led
+pinMode(PIRPin,INPUT); // PIR motion sensor
+pinMode(RedLedPin, OUTPUT); // Red led
+
+printf("MOTION DETECTOR PROJECT\n");
+printf("Program is starting ...\n");
+ 
+pcf8574Setup(BASE,pcf8574_address);//initialize PCF8574 
+
+for(int i=0;i<8;i++){
+	pinMode(BASE+i,OUTPUT); //set PCF8574 port to output mode
+}
+ 
+digitalWrite(LED,HIGH); // LCD backlight is ON
+digitalWrite(RW,LOW); // Write to LCD
+ 
+lcdhd = lcdInit(2,16,4,RS,EN,D4,D5,D6,D7,0,0,0,0); // initialize LCD and return “handle” used to handle LCD
+                                                   
+if(lcdhd == -1){
+	printf("lcdInit failed");
+    return 1;
+}
+
+while(1){
+	if(!(digitalRead(PIRPin))){ // Read the PIR pin state. Return 1 if motion is detected. If motion not detected we do the following below:
+		digitalWrite(BuzzerGreenLedPin, HIGH); // BuzzerGreenLed pin state is HIGH => buzzer is OFF & green led is ON
+        digitalWrite(RedLedPin, LOW); // Red led is OFF 
+        lcdClear(lcdhd); // Clear LCD screen to make sure there is no extra characters displayed on the screen from the previous message 
+        lcdPosition(lcdhd,5,1);// Set the LCD cursor position to (5,1)
+        lcdPrintf(lcdhd,"ARMED"); // Print ARMED to LCD screen meaning alarm is armed and there is no motion detected
+    
+        printf("\n");
+        printf("No motion\n");
+        printf("___________________________");
+
+        delay(1000); // Wait for 1 second		  	 
+}
+
+else{
+	digitalWrite(BuzzerGreenLedPin, LOW); // BuzzerGreenLed pin state is LOW => buzzer is ON (buzzing) & green led is OFF
+    digitalWrite(RedLedPin, HIGH); // Red led is ON 
+    lcdPosition(lcdhd,5,1);// Set the LCD cursor position to (5,1)
+    lcdPrintf(lcdhd,"MOTION"); // Print MOTION to LCD screen meaning alarm goes off when motion is detected
+    
+    printf("\n");
+    printf("Motion detected\n");
+    printf("___________________________");
+    
+    delay(1000); // Wait for 1 second
+}
+}                                           
+
+return 0;
+}
